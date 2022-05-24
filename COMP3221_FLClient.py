@@ -12,6 +12,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
 
+num_epochs = 10
+learning_rate = 0.001
+
 
 def get_data(id=""):
     train_path = os.path.join("FLdata", "train", "mnist_train_" + str(id) + ".json")
@@ -64,6 +67,9 @@ class CNN(nn.Module):
         output = self.out(x)
         return output, x    # return x for visualization
 
+cnn = CNN()
+loss_func = nn.CrossEntropyLoss()   
+optimizer = torch.optim.Adam(cnn.parameters(), lr = learning_rate) 
 
 def train(num_epochs, cnn, loaders):
     
@@ -71,7 +77,7 @@ def train(num_epochs, cnn, loaders):
         
     # Train the model
     total_step = len(loaders['train'])
-    loss = 0    
+    # loss = 0    
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(loaders['train']):
             
@@ -91,7 +97,7 @@ def train(num_epochs, cnn, loaders):
             
             if (i+1) % 10 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
-    return loss.data()
+    return loss.data
 
 def test():
     # Test the model
@@ -104,28 +110,8 @@ def test():
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             test_accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
             test_counter += 1
-        print('Test Accuracy of the model on the test images: %.2f' % (accuracy/test_counter))
+        print('Test accuracy of the model on the test images: %.2f' % (test_accuracy/test_counter))
         return test_accuracy
-
-def send_parameters(server_model, users):
-    for user in users:
-        user.set_parameters(server_model)
-
-def aggregate_parameters(server_model, users, total_train_samples):
-    # Clear global model before aggregation
-    for param in server_model.parameters():
-        param.data = torch.zeros_like(param.data)
-        
-    for user in users:
-        for server_param, user_param in zip(server_model.parameters(), user.model.parameters()):
-            server_param.data = server_param.data + user_param.data.clone() * user.train_samples / total_train_samples
-    return server_model
-
-def evaluate(user):
-    total_accurancy = 0
-    for user in users:
-        total_accurancy += user.test()
-    return total_accurancy/len(users)
 
     
 IP = '127.0.0.1'
@@ -133,9 +119,6 @@ port_server = 6000
 client_id = sys.argv[1]
 port_client = int(sys.argv[2])
 opt_method = int(sys.argv[3])
-
-num_epochs = 10
-learning_rate = 0.001
 
 X_train, y_train, X_test, y_test, _, _ = get_data(client_id)
 train_data = [(x, y) for x, y in zip(X_train, y_train)]
@@ -163,11 +146,9 @@ loaders = {
                                           num_workers=0),
 }
 
-#cnn = CNN()
-#loss_func = nn.CrossEntropyLoss()   
-#optimizer = torch.optim.Adam(cnn.parameters(), lr = learning_rate) 
-#train()
-#test()
+
+train(num_epochs, cnn, loaders)
+test()
 
 
 
