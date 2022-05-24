@@ -5,8 +5,8 @@ import os
 import json
 import copy
 import sys
-import pickle
 import socket
+import pickle
 from torch.utils.data import DataLoader
 import matplotlib
 import matplotlib.pyplot as plt
@@ -71,7 +71,7 @@ def train(num_epochs, cnn, loaders):
         
     # Train the model
     total_step = len(loaders['train'])
-        
+    loss = 0    
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(loaders['train']):
             
@@ -91,22 +91,43 @@ def train(num_epochs, cnn, loaders):
             
             if (i+1) % 10 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
-
+    return loss.data()
 
 def test():
     # Test the model
     cnn.eval()
     with torch.no_grad():
         test_counter = 0
-        accuracy = 0
+        test_accuracy = 0
         for images, labels in loaders['test']:
             test_output, last_layer = cnn(images)
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
-            accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
+            test_accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
             test_counter += 1
         print('Test Accuracy of the model on the test images: %.2f' % (accuracy/test_counter))
+        return test_accuracy
 
+def send_parameters(server_model, users):
+    for user in users:
+        user.set_parameters(server_model)
 
+def aggregate_parameters(server_model, users, total_train_samples):
+    # Clear global model before aggregation
+    for param in server_model.parameters():
+        param.data = torch.zeros_like(param.data)
+        
+    for user in users:
+        for server_param, user_param in zip(server_model.parameters(), user.model.parameters()):
+            server_param.data = server_param.data + user_param.data.clone() * user.train_samples / total_train_samples
+    return server_model
+
+def evaluate(user):
+    total_accurancy = 0
+    for user in users:
+        total_accurancy += user.test()
+    return total_accurancy/len(users)
+
+    
 IP = '127.0.0.1'
 port_server = 6000
 client_id = sys.argv[1]
@@ -147,7 +168,6 @@ loaders = {
 #optimizer = torch.optim.Adam(cnn.parameters(), lr = learning_rate) 
 #train()
 #test()
-
 
 
 
