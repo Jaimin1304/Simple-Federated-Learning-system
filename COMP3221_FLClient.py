@@ -5,10 +5,13 @@ import os
 import json
 import copy
 import sys
+import pickle
+import socket
 from torch.utils.data import DataLoader
 import matplotlib
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
+
 
 def get_data(id=""):
     train_path = os.path.join("FLdata", "train", "mnist_train_" + str(id) + ".json")
@@ -31,27 +34,6 @@ def get_data(id=""):
     train_samples, test_samples = len(y_train), len(y_test)
     return X_train, y_train, X_test, y_test, train_samples, test_samples
 
-client_id = sys.argv[1]
-port_client = int(sys.argv[2])
-opt_method = int(sys.argv[3])
-
-X_train, y_train, X_test, y_test, _, _ = get_data(client_id)
-
-train_data = [(x, y) for x, y in zip(X_train, y_train)]
-test_data = [(x, y) for x, y in zip(X_test, y_test)]
-
-loaders = {
-    'train' : torch.utils.data.DataLoader(train_data, 
-                                          batch_size=100, 
-                                          shuffle=True, 
-                                          num_workers=0),
-    
-    'test'  : torch.utils.data.DataLoader(test_data, 
-                                          batch_size=100, 
-                                          shuffle=True, 
-                                          num_workers=0),
-}
-print(loaders)
 
 class CNN(nn.Module):
     def __init__(self):
@@ -82,16 +64,7 @@ class CNN(nn.Module):
         output = self.out(x)
         return output, x    # return x for visualization
 
-cnn = CNN()
-print(cnn)
 
-loss_func = nn.CrossEntropyLoss()   
-print(loss_func)
-
-optimizer = torch.optim.Adam(cnn.parameters(), lr = 0.01) 
-print(optimizer)
-
-num_epochs = 10
 def train(num_epochs, cnn, loaders):
     
     cnn.train()
@@ -119,7 +92,6 @@ def train(num_epochs, cnn, loaders):
             if (i+1) % 10 == 0:
                 print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
 
-train(num_epochs, cnn, loaders)
 
 def test():
     # Test the model
@@ -134,4 +106,50 @@ def test():
             test_counter += 1
         print('Test Accuracy of the model on the test images: %.2f' % (accuracy/test_counter))
 
-test()
+
+IP = '127.0.0.1'
+port_server = 6000
+client_id = sys.argv[1]
+port_client = int(sys.argv[2])
+opt_method = int(sys.argv[3])
+
+num_epochs = 10
+learning_rate = 0.001
+
+X_train, y_train, X_test, y_test, _, _ = get_data(client_id)
+train_data = [(x, y) for x, y in zip(X_train, y_train)]
+test_data = [(x, y) for x, y in zip(X_test, y_test)]
+
+# Create a UDP socket for sending global model / training dataset shape to the server
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
+addr = (IP, port_server)
+client_socket.sendto(pickle.dumps((client_id, list(X_train.shape))), addr)
+
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
+server_socket.bind(('', port_client))
+
+loaders = {
+    'train' : torch.utils.data.DataLoader(train_data, 
+                                          batch_size=100, 
+                                          shuffle=True, 
+                                          num_workers=0),
+    
+    'test'  : torch.utils.data.DataLoader(test_data, 
+                                          batch_size=100, 
+                                          shuffle=True, 
+                                          num_workers=0),
+}
+
+#cnn = CNN()
+#loss_func = nn.CrossEntropyLoss()   
+#optimizer = torch.optim.Adam(cnn.parameters(), lr = learning_rate) 
+#train()
+#test()
+
+
+
+
+
+
