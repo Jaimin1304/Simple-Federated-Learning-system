@@ -67,24 +67,43 @@ class CNN(nn.Module):
         output = self.out(x)
         return output, x    # return x for visualization
 
-cnn = CNN()
+model = CNN()
 loss_func = nn.CrossEntropyLoss()   
-optimizer = torch.optim.Adam(cnn.parameters(), lr = learning_rate) 
+optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate) 
 
-def train(num_epochs, cnn, loaders):
+def train(num_epochs, model, loader, opt_method):
     
-    cnn.train()
+    model.train()
         
     # Train the model
-    total_step = len(loaders['train'])
-    # loss = 0    
-    for epoch in range(num_epochs):
-        for i, (images, labels) in enumerate(loaders['train']):
-            
+    total_step = len(loader['train'])
+    
+    if opt_method:    
+        for epoch in range(num_epochs):
+            for i, (images, labels) in enumerate(loader['train']):
+                
+                # gives batch data, normalize x when iterate train_loader
+                b_x = Variable(images)   # batch x
+                b_y = Variable(labels)   # batch y
+                output = model(b_x)[0]               
+                loss = loss_func(output, b_y)
+                
+                # clear gradients for this training step   
+                optimizer.zero_grad()           
+                
+                # backpropagation, compute gradients 
+                loss.backward()    
+                # apply gradients             
+                optimizer.step()                
+                
+                if (i+1) % 10 == 0:
+                    print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+    else:
+        for epoch in range(num_epochs):              
             # gives batch data, normalize x when iterate train_loader
-            b_x = Variable(images)   # batch x
-            b_y = Variable(labels)   # batch y
-            output = cnn(b_x)[0]               
+            b_x = Variable(X_train)   # batch x
+            b_y = Variable(y_train)   # batch y
+            output = model(b_x)[0]               
             loss = loss_func(output, b_y)
             
             # clear gradients for this training step   
@@ -95,25 +114,28 @@ def train(num_epochs, cnn, loaders):
             # apply gradients             
             optimizer.step()                
             
-            if (i+1) % 10 == 0:
-                print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+            print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, loss.item()))
+
     return loss.data
 
-def test():
+def test(model, loader):
     # Test the model
-    cnn.eval()
+    model.eval()
     with torch.no_grad():
         test_counter = 0
         test_accuracy = 0
-        for images, labels in loaders['test']:
-            test_output, last_layer = cnn(images)
+        for images, labels in loader['test']:
+            test_output, last_layer = model(images)
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             test_accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
             test_counter += 1
         print('Test accuracy of the model on the test images: %.2f' % (test_accuracy/test_counter))
         return test_accuracy
 
-    
+def set_parameters(model):
+    for old_param, new_param in zip(model.parameters(), model.parameters()):
+        old_param.data = new_param.data.clone()
+
 IP = '127.0.0.1'
 port_server = 6000
 client_id = sys.argv[1]
@@ -147,8 +169,38 @@ loaders = {
 }
 
 
-train(num_epochs, cnn, loaders)
-test()
+# train(num_epochs, model, loaders)
+# test()
+
+
+while True:
+    # receive global model from the server
+    received_data, adr = server_socket.recvfrom(65507)
+    global_model = pickle.loads(received_data)
+    # training loss
+    for local_param, global_param in zip(model.parameters(), global_model.parameters()):
+        local_param.data = global_param.data.clone()
+
+    local_loss = train(num_epochs, model, loaders, opt_method)
+
+    # make the prediction using global model, and calculate accuracy
+    local_accuracy = test(model, loaders)
+
+
+    # output information
+    print("I am {}".format(client_id))
+    print("Receiving new global model")
+    print("Training loss: {:2f}".format(local_loss))
+    print("Testing accuracy: {:.2f}%".format(local_accuracy))
+    print("Local training...")
+    print("Sending new local model")
+    print()
+
+    local_model_with_id = [client_id, model]
+
+    # sending new local model to the server
+    addr = (IP, port_server)
+    client_socket.sendto(pickle.dumps(local_model_with_id), addr)
 
 
 
