@@ -14,7 +14,7 @@ from torch.autograd import Variable
 
 num_epochs = 10
 learning_rate = 0.001
-
+batch_size = 256
 
 def get_data(id=""):
     train_path = os.path.join("FLdata", "train", "mnist_train_" + str(id) + ".json")
@@ -67,18 +67,19 @@ class CNN(nn.Module):
         output = self.out(x)
         return output, x    # return x for visualization
 
+
 model = CNN()
 loss_func = nn.CrossEntropyLoss()   
 optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate) 
 
+
 def train(num_epochs, model, loader, opt_method):
     
     model.train()
-        
-    # Train the model
-    total_step = len(loader['train'])
-    
-    if opt_method:    
+
+    # train the model using minibatch GD
+    if opt_method:   
+        total_step = len(loader['train']) 
         for epoch in range(num_epochs):
             for i, (images, labels) in enumerate(loader['train']):
                 
@@ -90,14 +91,15 @@ def train(num_epochs, model, loader, opt_method):
                 
                 # clear gradients for this training step   
                 optimizer.zero_grad()           
-                
                 # backpropagation, compute gradients 
                 loss.backward()    
                 # apply gradients             
                 optimizer.step()                
                 
-                if (i+1) % 10 == 0:
+                if (i+1) % 5 == 0:
                     print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+
+    # train the model using GD
     else:
         for epoch in range(num_epochs):              
             # gives batch data, normalize x when iterate train_loader
@@ -107,13 +109,12 @@ def train(num_epochs, model, loader, opt_method):
             loss = loss_func(output, b_y)
             
             # clear gradients for this training step   
-            optimizer.zero_grad()           
-            
+            optimizer.zero_grad()              
             # backpropagation, compute gradients 
-            loss.backward()    
+            loss.backward()
             # apply gradients             
             optimizer.step()                
-            
+
             print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, loss.item()))
 
     return loss.data
@@ -141,53 +142,56 @@ port_server = 6000
 client_id = sys.argv[1]
 port_client = int(sys.argv[2])
 opt_method = int(sys.argv[3])
+server_address = (IP, port_server)
 
 X_train, y_train, X_test, y_test, _, _ = get_data(client_id)
 train_data = [(x, y) for x, y in zip(X_train, y_train)]
 test_data = [(x, y) for x, y in zip(X_test, y_test)]
 
-# Create a UDP socket for sending global model / training dataset shape to the server
+# create client_socket for sending client information and the local model to the server
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
-addr = (IP, port_server)
-client_socket.sendto(pickle.dumps((client_id, list(X_train.shape))), addr)
+client_socket.sendto(pickle.dumps((client_id, list(X_train.shape))), server_address)
 
+# create server_socket for receiving the global model from the server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
 server_socket.bind(('', port_client))
 
+# dataloader for the minibatch GD
 minibatch_loader = {
     'train' : torch.utils.data.DataLoader(train_data, 
-                                          batch_size=100, 
-                                          shuffle=True, 
-                                          num_workers=0),
+                                          batch_size=batch_size, 
+                                          shuffle=True),
     
     'test'  : torch.utils.data.DataLoader(test_data, 
-                                          batch_size=100, 
-                                          shuffle=True, 
-                                          num_workers=0),
+                                          batch_size=batch_size, 
+                                          shuffle=True),
 }
 
 
+## debug train() and test()...
 # train(num_epochs, model, minibatch_loader)
 # test()
 
 
+# keep listening to the server 
 while True:
     # receive global model from the server
     received_data, adr = server_socket.recvfrom(65507)
     global_model = pickle.loads(received_data)
-    # training loss
+
+    # upadte local model parameters 
     for local_param, global_param in zip(model.parameters(), global_model.parameters()):
         local_param.data = global_param.data.clone()
 
+    # train the local model using the parameters from the global model
     local_loss = train(num_epochs, model, minibatch_loader, opt_method)
 
-    # make the prediction using global model, and calculate accuracy
+    # test using the local model (after training), and calculate testing accuracy
     local_accuracy = test(model, minibatch_loader)
 
-
-    # output information
+    # print the client information
     print("I am {}".format(client_id))
     print("Receiving new global model")
     print("Training loss: {:2f}".format(local_loss))
@@ -197,8 +201,7 @@ while True:
 
     local_model_with_id = [client_id, model]
 
-    # sending new local model to the server
-    addr = (IP, port_server)
+    # send local model (after training) back to the server
     client_socket.sendto(pickle.dumps(local_model_with_id), addr)
 
 
