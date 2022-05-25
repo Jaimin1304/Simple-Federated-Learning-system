@@ -68,18 +68,3 @@ for glob_iter in range(num_glob_iters):
     
     # TODO:  Aggregate all clients model to obtain new global model 
     aggregate_parameters(server_model, users, total_train_samples)
-
-plt.figure(1,figsize=(5, 5))
-plt.plot(loss, label="FedAvg", linewidth  = 1)
-plt.legend(loc='upper right', prop={'size': 12}, ncol=2)
-plt.ylabel('Training Loss')
-plt.xlabel('Global rounds')
-plt.show()
-
-plt.figure(1,figsize=(5, 5))
-plt.plot(acc, label="FedAvg", linewidth  = 1)
-plt.ylim([0.9,  0.99])
-plt.legend(loc='upper right', prop={'size': 12}, ncol=2)
-plt.ylabel('Testing Acc')
-plt.xlabel('Global rounds')
-plt.show()
