@@ -156,7 +156,7 @@ server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
 server_socket.bind(('', port_client))
 
-loaders = {
+minibatch_loader = {
     'train' : torch.utils.data.DataLoader(train_data, 
                                           batch_size=100, 
                                           shuffle=True, 
@@ -169,7 +169,7 @@ loaders = {
 }
 
 
-# train(num_epochs, model, loaders)
+# train(num_epochs, model, minibatch_loader)
 # test()
 
 
@@ -181,10 +181,10 @@ while True:
     for local_param, global_param in zip(model.parameters(), global_model.parameters()):
         local_param.data = global_param.data.clone()
 
-    local_loss = train(num_epochs, model, loaders, opt_method)
+    local_loss = train(num_epochs, model, minibatch_loader, opt_method)
 
     # make the prediction using global model, and calculate accuracy
-    local_accuracy = test(model, loaders)
+    local_accuracy = test(model, minibatch_loader)
 
 
     # output information
