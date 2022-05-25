@@ -133,9 +133,6 @@ def test(model, loader):
         print('Test accuracy of the model on the test images: %.2f' % (test_accuracy/test_counter))
         return test_accuracy
 
-def set_parameters(model):
-    for old_param, new_param in zip(model.parameters(), model.parameters()):
-        old_param.data = new_param.data.clone()
 
 IP = '127.0.0.1'
 port_server = 6000
