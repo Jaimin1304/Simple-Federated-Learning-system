@@ -201,8 +201,3 @@ while True:
     # sending new local model to the server
     addr = (IP, port_server)
     client_socket.sendto(pickle.dumps(local_model_with_id), addr)
-
-
-
-
-
