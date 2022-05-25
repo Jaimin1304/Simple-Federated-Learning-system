@@ -193,8 +193,7 @@ while True:
     print("Training loss: {:2f}".format(local_loss))
     print("Testing accuracy: {:.2f}%".format(local_accuracy))
     print("Local training...")
-    print("Sending new local model")
-    print()
+    print("Sending new local model\n")
 
     local_model_with_id = [client_id, model]
 
