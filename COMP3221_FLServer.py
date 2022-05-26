@@ -40,6 +40,7 @@ class CNN(nn.Module):
         return output, x    # return x for visualization
 
 def aggregate_parameters(gl_model, clients_lst, total_train_samples):
+    print('Aggregating new global model')
     # Clear global model before aggregation
     for param in gl_model.parameters():
         param.data = torch.zeros_like(param.data)
@@ -85,19 +86,24 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             break
     s.close()
 
+# broadcast the initial global model to all clients
+for client in clients_lst:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
+        s_bcast.sendto(gl_model.encode(), client[1])
+        s_bcast.close()
+
 # Runing FedAvg
 loss = []
 acc = []
 total_train_samples = sum([i[2] for i in clients_lst])
 
+# create server socket for listening
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind((IP, port_server))
+
 for round in range(round_limit):
-    # broadcast the global model to all clients
-    for client in clients_lst:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
-            s_bcast.sendto(gl_model.encode(), client[1])
-            s_bcast.close()
+    print(f'Global iteration {round+1}:')
+    print(f'Total number of clients: {len(clients_lst)}')
 
     # receive local models from all clients
     responded_clients = 0
@@ -115,6 +121,7 @@ for round in range(round_limit):
         for c in clients_lst:
             if client_id == c[1]:
                 c[3] = data_recv[2]
+                print(f'Getting local model from client {c[0]}')
 
     # Evaluate the global model across all clients
     avg_acc = evaluate(clients_lst)
@@ -136,3 +143,11 @@ for round in range(round_limit):
 
     # Aggregate all clients model to obtain new global model 
     aggregate_parameters(gl_model, clients_lst, total_train_samples)
+
+    # broadcast the global model to all clients
+    print('Broadcasting new global model')
+    print()
+    for client in clients_lst:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
+            s_bcast.sendto(gl_model.encode(), client[1])
+            s_bcast.close()
