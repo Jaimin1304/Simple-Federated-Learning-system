@@ -41,21 +41,21 @@ def get_data(id=""):
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Sequential(         
+        self.conv1 = nn.Sequential(
             nn.Conv2d(
-                in_channels=1,              
-                out_channels=16,            
-                kernel_size=5,              
-                stride=1,                   
-                padding=2,                  
-            ),                              
-            nn.ReLU(),                      
-            nn.MaxPool2d(kernel_size=2),    
+                in_channels=1,
+                out_channels=16,
+                kernel_size=5,
+                stride=1,
+                padding=2,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
         )
-        self.conv2 = nn.Sequential(         
-            nn.Conv2d(16, 32, 5, 1, 2),     
-            nn.ReLU(),                      
-            nn.MaxPool2d(2),                
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(16, 32, 5, 1, 2),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
         )
         # fully connected layer, output 10 classes
         self.out = nn.Linear(32 * 7 * 7, 10)
@@ -63,7 +63,7 @@ class CNN(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
-        x = x.view(x.size(0), -1)       
+        x = x.view(x.size(0), -1)
         output = self.out(x)
         return output, x    # return x for visualization
 
@@ -78,7 +78,7 @@ def train(num_epochs, model, loader, opt_method):
     model.train()
 
     # train the model using minibatch GD
-    if opt_method:   
+    if opt_method:
         total_step = len(loader['train']) 
         for epoch in range(num_epochs):
             for i, (images, labels) in enumerate(loader['train']):
@@ -148,7 +148,7 @@ test_data = [(x, y) for x, y in zip(X_test, y_test)]
 # create client_socket for sending client information and the local model to the server
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
-client_socket.sendto(pickle.dumps((client_id, list(X_train.shape))), server_address)
+client_socket.sendto(pickle.dumps((client_id, port_client, list(X_train.shape))), server_address)
 
 # create server_socket for receiving the global model from the server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
