@@ -66,7 +66,7 @@ clients_lst = []
 gl_model = CNN()
 print(getsizeof(gl_model.parameters))
 round_limit = 100 # No. of global rounds
-s_hh = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 
 
 class Handshakes_handler(threading.Thread):
@@ -77,15 +77,17 @@ class Handshakes_handler(threading.Thread):
         global clients_lst
         global s_hh
         # wait for the first connection
-        s_hh.bind((IP, port_server)) # Bind to the port
         # and the following connections in the following 30s
         while True:
+            s_hh = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s_hh.bind((IP, port_server)) # Bind to the port
             print('Handshakes_handler')
             data_recv = s_hh.recv(2048)
             data_recv = pickle.loads(data_recv)
             # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
             if len(clients_lst) < 5:
                 clients_lst.append([data_recv[1], int(data_recv[3]), int(data_recv[2]), None, None])
+            s_hh.close()
 
 
 # wait for the first connection 
@@ -97,7 +99,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     data_recv = pickle.loads(data_recv)
     s.close()
     # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
-    clients_lst.append([data_recv[1], int(data_recv[3]), int(data_recv[2]), None, None])
+    clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None])
     # start handshake_handler thread to deal with the rest of the handshakes
     # and count down 30s
     handshakes_handler = Handshakes_handler()
@@ -105,13 +107,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     print('hey')
     # stop receiving handshaking msg 30s after the first handshake
     handshakes_handler.join(5)
-    s_hh.close()
+    
 
 # broadcast the initial global model to all clients
 for client in clients_lst:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
-        print(client[1])
-        s_bcast.sendto(pickle.dumps(gl_model.parameters), client[1])
+        print((IP, client[1]))
+        s_bcast.sendto(pickle.dumps(gl_model.parameters), (IP, client[1]))
         s_bcast.close()
 
 # Runing FedAvg
@@ -171,5 +173,5 @@ for round in range(round_limit):
     print()
     for client in clients_lst:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
-            s_bcast.sendto(pickle.dumps(gl_model), client[1])
+            s_bcast.sendto(pickle.dumps(gl_model), (IP, client[1]))
             s_bcast.close()
