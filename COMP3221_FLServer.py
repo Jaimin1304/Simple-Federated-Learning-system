@@ -12,7 +12,7 @@ from random import randint
 class MCLR(nn.Module):
     def __init__(self):
         super(MCLR, self).__init__()
-        # Create a linear transformation to the incoming data
+        # Create a linear transformation to the incoming data_recv
         # Input dimension: 784 (28 x 28), Output dimension: 10 (10 classes)
         self.fc1 = nn.Linear(784, 10)
 
@@ -26,18 +26,14 @@ class MCLR(nn.Module):
         output = F.log_softmax(x, dim=1)
         return output
 
-def send_parameters(server_model, clients_lst):
-    for user in clients_lst:
-        user.set_parameters(server_model)
-
 def aggregate_parameters(server_model, clients_lst, total_train_samples):
     # Clear global model before aggregation
     for param in server_model.parameters():
-        param.data = torch.zeros_like(param.data)
+        param.data_recv = torch.zeros_like(param.data_recv)
         
     for user in clients_lst:
         for server_param, user_param in zip(server_model.parameters(), user.model.parameters()):
-            server_param.data = server_param.data + user_param.data.clone() * user.train_samples / total_train_samples
+            server_param.data_recv = server_param.data_recv + user_param.data_recv.clone() * user.train_samples / total_train_samples
     return server_model
 
 def evaluate(clients_lst):
@@ -54,9 +50,9 @@ IP = '127.0.0.1'
 clients_lst = []
 server_model = MCLR()
 learning_rate = 0.001
-num_glob_iters = 100 # No. of global rounds
+round_limit = 100 # No. of global rounds
 curr_round = 0
-w = randint(0, 10)
+gl_model = randint(0, 10)
 
 # wait for the first connection 
 # and the following connections in the following 30s
@@ -64,16 +60,16 @@ first_conn_time = 0
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind((IP, port_server)) # Bind to the port
     while True:
-        data = s.recv(2048)
-        data = pickle.loads(data)
+        data_recv, addr = s.recvfrom(2048)
+        data_recv = pickle.loads(data_recv)
         # check if this is the first connection
         if len(clients_lst) == 0:
             first_conn_time = time()
-        # add new client to the lst: [client_id, client_port, data_size]
+        # add new client to the lst: [client_id, client_addr, data_recv_size]
         if len(clients_lst) < 5:
-            clients_lst.append([int(data[0]), int(data[1]), int(data[2])])
+            clients_lst.append([int(data_recv[0]), addr, int(data_recv[1])])
         # stop receiving handshaking msg 30s after the first handshake
-        if time() - first_conn_time >= 30 and first_conn_time != 0:
+        if time() - first_conn_time >= 30 and first_conn_time > 0:
             break
     s.close()
 
@@ -81,21 +77,26 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
 loss = []
 acc = []
 
-for glob_iter in range(num_glob_iters):
-    # Broadcast global model to all clients
-    send_parameters(server_model,clients_lst)
-    
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind((IP, port_server))
+for round in range(round_limit):
+    # broadcast the global model to all clients
+    for client in clients_lst:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
+            s_bcast.sendto(gl_model.encode(), client[1])
+            s_bcast.close()
+
     # Evaluate the global model across all clients
     avg_acc = evaluate(clients_lst)
     acc.append(avg_acc)
-    print("Global Round:", glob_iter + 1, "Average accuracy across all clients : ", avg_acc)
-    
-    # Each client keeps training process to  obtain new local model from the global model 
+    print("Global Round:", round + 1, "Average accuracy across all clients : ", avg_acc)
+
+    # Each client keeps training process to obtain new local model from the global model 
     avgLoss = 0
     for user in clients_lst:
         avgLoss += user.train(1)
     # Above process training all clients and all client paricipate to server, how can we just select subset of user for aggregation
     loss.append(avgLoss)
-    
+
     # TODO:  Aggregate all clients model to obtain new global model 
     aggregate_parameters(server_model, clients_lst, total_train_samples)
