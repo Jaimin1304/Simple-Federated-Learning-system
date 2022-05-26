@@ -41,17 +41,17 @@ class CNN(nn.Module):
 def aggregate_parameters(gl_model, clients_lst, total_train_samples):
     # Clear global model before aggregation
     for param in gl_model.parameters():
-        param.data_recv = torch.zeros_like(param.data_recv)
-        
-    for user in clients_lst:
-        for server_param, user_param in zip(gl_model.parameters(), user.model.parameters()):
-            server_param.data_recv = server_param.data_recv + user_param.data_recv.clone() * user.train_samples / total_train_samples
+        param.data = torch.zeros_like(param.data)
+
+    for client in clients_lst:
+        for server_param, client_param in zip(gl_model.parameters(), client.model.parameters()):
+            server_param.data = server_param.data + client_param.data.clone() * client.train_samples / total_train_samples
     return gl_model
 
 def evaluate(clients_lst):
     total_accurancy = 0
-    for user in clients_lst:
-        total_accurancy += user.test()
+    for client in clients_lst:
+        total_accurancy += client.test()
     return total_accurancy/len(clients_lst)
 
 
@@ -75,9 +75,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         # check if this is the first connection
         if len(clients_lst) == 0:
             first_conn_time = time()
-        # add new client to the lst: [client_id, client_addr, data_recv_size]
+        # add new client to the lst: [client_id, client_addr, data_recv_size, model]
         if len(clients_lst) < 5:
-            clients_lst.append([int(data_recv[0]), addr, int(data_recv[1])])
+            clients_lst.append([int(data_recv[1]), addr, int(data_recv[2]), None])
         # stop receiving handshaking msg 30s after the first handshake
         if time() - first_conn_time >= 30 and first_conn_time > 0:
             break
@@ -97,12 +97,21 @@ for round in range(round_limit):
             s_bcast.close()
 
     # receive local models from all clients
-    responded_clients = []
-    while len(responded_clients) < len(clients_lst):
+    responded_clients = 0
+    while responded_clients < len(clients_lst):
         responded_clients += 1
         data_recv, addr = s.recvfrom(65507)
         data_recv = pickle.loads(data_recv)
         # check if this msg is a handshaking msg from a late-joinned client
+        if data_recv[0] == 'handshake':
+            if len(clients_lst) < 5:
+                clients_lst.append([int(data_recv[1]), addr, int(data_recv[2]), None])
+            continue
+
+        client_id = data_recv[1]
+        for c in clients_lst:
+            if client_id == c[1]:
+                c[3] = data_recv[2]
 
     # Evaluate the global model across all clients
     avg_acc = evaluate(clients_lst)
@@ -111,9 +120,9 @@ for round in range(round_limit):
 
     # Each client keeps training process to obtain new local model from the global model 
     avgLoss = 0
-    for user in clients_lst:
-        avgLoss += user.train(1)
-    # Above process training all clients and all client paricipate to server, how can we just select subset of user for aggregation
+    for client in clients_lst:
+        avgLoss += client.train(1)
+    # Above process training all clients and all client paricipate to server, how can we just select subset of client for aggregation
     loss.append(avgLoss)
 
     # Aggregate all clients model to obtain new global model 

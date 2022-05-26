@@ -69,7 +69,7 @@ class CNN(nn.Module):
 
 
 model = CNN()
-loss_func = nn.CrossEntropyLoss()   
+loss_func = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate) 
 
 
@@ -86,34 +86,34 @@ def train(num_epochs, model, loader, opt_method):
                 # gives batch data, normalize x when iterate train_loader
                 b_x = Variable(images)   # batch x
                 b_y = Variable(labels)   # batch y
-                output = model(b_x)[0]               
+                output = model(b_x)[0]
                 loss = loss_func(output, b_y)
                 
-                # clear gradients for this training step   
-                optimizer.zero_grad()           
+                # clear gradients for this training step
+                optimizer.zero_grad()
                 # backpropagation, compute gradients 
-                loss.backward()    
-                # apply gradients             
-                optimizer.step()                
-                
+                loss.backward()
+                # apply gradients
+                optimizer.step()
+
                 if (i+1) % 5 == 0:
                     print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
 
     # train the model using GD
     else:
-        for epoch in range(num_epochs):              
+        for epoch in range(num_epochs):
             # gives batch data, normalize x when iterate train_loader
             b_x = Variable(X_train)   # batch x
             b_y = Variable(y_train)   # batch y
-            output = model(b_x)[0]               
+            output = model(b_x)[0]
             loss = loss_func(output, b_y)
             
-            # clear gradients for this training step   
-            optimizer.zero_grad()              
+            # clear gradients for this training step
+            optimizer.zero_grad()
             # backpropagation, compute gradients 
             loss.backward()
-            # apply gradients             
-            optimizer.step()                
+            # apply gradients
+            optimizer.step()
 
             print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, loss.item()))
 
@@ -148,7 +148,7 @@ test_data = [(x, y) for x, y in zip(X_test, y_test)]
 # create client_socket for sending client information and the local model to the server
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
-client_socket.sendto(pickle.dumps((client_id, list(X_train.shape))), server_address)
+client_socket.sendto(pickle.dumps(('handshake', client_id, list(X_train.shape)[0])), server_address)
 
 # create server_socket for receiving the global model from the server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -196,7 +196,7 @@ while True:
     print("Local training...")
     print("Sending new local model\n")
 
-    local_model_with_id = [client_id, model]
+    local_model_with_id = ['model', client_id, model, local_accuracy]
 
     # send local model (after training) back to the server
     client_socket.sendto(pickle.dumps(local_model_with_id), addr)
