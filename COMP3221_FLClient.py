@@ -74,7 +74,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
 
 
 def train(num_epochs, model, loader, opt_method):
-    
+
     model.train()
 
     # train the model using minibatch GD

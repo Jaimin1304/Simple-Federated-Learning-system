@@ -1,10 +1,11 @@
+from ctypes import sizeof
+import threading
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import socket
 from time import sleep, time
 from sys import argv
-import _thread
 import pickle
 from random import randint
 
@@ -56,38 +57,58 @@ def evaluate(clients_lst):
             total_accurancy += client[4]
     return total_accurancy/len(clients_lst)
 
-
 # Init parameters
 port_server = int(argv[1])
 sub_client = int(argv[2])
 IP = '127.0.0.1'
 clients_lst = []
 gl_model = CNN()
+print(sizeof(gl_model.parameters))
 round_limit = 100 # No. of global rounds
+s_hh = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+
+class Handshakes_handler(threading.Thread):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def run():
+        global clients_lst
+        global s_hh
+        # wait for the first connection
+        # and the following connections in the following 30s
+        s_hh.bind((IP, port_server)) # Bind to the port
+        while True:
+            print('Handshakes_handler')
+            data_recv, addr = s_hh.recvfrom(4096)
+            data_recv = pickle.loads(data_recv)
+            # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
+            if len(clients_lst) < 5:
+                clients_lst.append([data_recv[1], addr, int(data_recv[2]), None, None])
+
 
 # wait for the first connection 
-# and the following connections in the following 30s
-first_conn_time = 0
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind((IP, port_server)) # Bind to the port
-    while True:
-        data_recv, addr = s.recvfrom(4096)
-        data_recv = pickle.loads(data_recv)
-        # check if this is the first connection
-        if len(clients_lst) == 0:
-            first_conn_time = time()
-        # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
-        if len(clients_lst) < 5:
-            clients_lst.append([int(data_recv[1]), addr, int(data_recv[2]), None, None])
-        # stop receiving handshaking msg 30s after the first handshake
-        if time() - first_conn_time >= 30 and first_conn_time > 0:
-            break
+    print('hahaha')
+    # handle the first handshake outside the handshake_handler thread
+    data_recv, addr = s.recvfrom(4096)
+    data_recv = pickle.loads(data_recv)
     s.close()
+    # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
+    clients_lst.append([data_recv[1], addr, int(data_recv[2]), None, None])
+    # start handshake_handler thread to deal with the rest of the handshakes
+    # and count down 30s
+    handshakes_handler = Handshakes_handler()
+    handshakes_handler.start()
+    # stop receiving handshaking msg 30s after the first handshake
+    handshakes_handler.join(30)
+    s_hh.close()
 
 # broadcast the initial global model to all clients
 for client in clients_lst:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
-        s_bcast.sendto(gl_model.encode(), client[1])
+        s_bcast.sendto(pickle.dumps(gl_model.parameters), client[1])
         s_bcast.close()
 
 # Runing FedAvg
@@ -147,5 +168,5 @@ for round in range(round_limit):
     print()
     for client in clients_lst:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
-            s_bcast.sendto(gl_model.encode(), client[1])
+            s_bcast.sendto(pickle.dumps(gl_model), client[1])
             s_bcast.close()
