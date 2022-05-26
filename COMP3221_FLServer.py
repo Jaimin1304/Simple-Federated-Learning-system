@@ -38,14 +38,14 @@ class CNN(nn.Module):
         output = self.out(x)
         return output, x    # return x for visualization
 
-def aggregate_parameters(gl_model, clients_lst, total_train_samples):
+def aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client):
     print('Aggregating new global model')
     # Clear global model before aggregation
     for param in gl_model.parameters():
         param.data = torch.zeros_like(param.data)
 
     for client in clients_lst:
-        for server_param, client_param in zip(gl_model.parameters(), client.model.parameters()):
+        for server_param, client_param in zip(gl_model.parameters(), client[3].parameters()):
             server_param.data = server_param.data + client_param.data.clone() * client[2] / total_train_samples
     return gl_model
 
@@ -64,7 +64,6 @@ IP = '127.0.0.1'
 clients_lst = []
 gl_model = CNN()
 round_limit = 100 # No. of global rounds
-curr_round = 0
 
 # wait for the first connection 
 # and the following connections in the following 30s
@@ -141,7 +140,7 @@ for round in range(round_limit):
             total_train_samples += i[2]
 
     # Aggregate all clients model to obtain new global model 
-    aggregate_parameters(gl_model, clients_lst, total_train_samples)
+    aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client)
 
     # broadcast the global model to all clients
     print('Broadcasting new global model')
