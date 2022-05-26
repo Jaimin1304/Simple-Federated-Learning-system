@@ -140,7 +140,7 @@ for round in range(round_limit):
             total_train_samples += i[2]
 
     # Aggregate all clients model to obtain new global model 
-    aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client)
+    gl_model = aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client)
 
     # broadcast the global model to all clients
     print('Broadcasting new global model')
