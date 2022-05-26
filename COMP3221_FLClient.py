@@ -148,7 +148,7 @@ test_data = [(x, y) for x, y in zip(X_test, y_test)]
 # create client_socket for sending client information and the local model to the server
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
-client_socket.sendto(pickle.dumps(('handshake', client_id, list(X_train.shape)[0])), server_address)
+client_socket.sendto(pickle.dumps(('handshake', client_id, list(X_train.shape)[0], port_client)), server_address)
 
 # create server_socket for receiving the global model from the server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -175,7 +175,7 @@ minibatch_loader = {
 # keep listening to the server 
 while True:
     # receive global model from the server
-    received_data, addr = server_socket.recvfrom(65507)
+    received_data, addr = server_socket.recvfrom(2048)
     global_model = pickle.loads(received_data)
 
     # upadte local model parameters 
