@@ -9,32 +9,44 @@ import pickle
 from random import randint
 
 
-class MCLR(nn.Module):
+class CNN(nn.Module):
     def __init__(self):
-        super(MCLR, self).__init__()
-        # Create a linear transformation to the incoming data_recv
-        # Input dimension: 784 (28 x 28), Output dimension: 10 (10 classes)
-        self.fc1 = nn.Linear(784, 10)
-
-    # Define how the model is going to be run, from input to output
+        super(CNN, self).__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(
+                in_channels=1,
+                out_channels=16,
+                kernel_size=5,
+                stride=1,
+                padding=2,
+            ),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(16, 32, 5, 1, 2),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+        )
+        # fully connected layer, output 10 classes
+        self.out = nn.Linear(32 * 7 * 7, 10)
     def forward(self, x):
-        # Flattens input by reshaping it into a one-dimensional tensor. 
-        x = torch.flatten(x, 1)
-        # Apply linear transformation
-        x = self.fc1(x)
-        # Apply a softmax followed by a logarithm
-        output = F.log_softmax(x, dim=1)
-        return output
+        x = self.conv1(x)
+        x = self.conv2(x)
+        # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
+        x = x.view(x.size(0), -1)
+        output = self.out(x)
+        return output, x    # return x for visualization
 
-def aggregate_parameters(server_model, clients_lst, total_train_samples):
+def aggregate_parameters(gl_model, clients_lst, total_train_samples):
     # Clear global model before aggregation
-    for param in server_model.parameters():
+    for param in gl_model.parameters():
         param.data_recv = torch.zeros_like(param.data_recv)
         
     for user in clients_lst:
-        for server_param, user_param in zip(server_model.parameters(), user.model.parameters()):
+        for server_param, user_param in zip(gl_model.parameters(), user.model.parameters()):
             server_param.data_recv = server_param.data_recv + user_param.data_recv.clone() * user.train_samples / total_train_samples
-    return server_model
+    return gl_model
 
 def evaluate(clients_lst):
     total_accurancy = 0
@@ -48,11 +60,9 @@ port_server = int(argv[1])
 sub_client = int(argv[2])
 IP = '127.0.0.1'
 clients_lst = []
-server_model = MCLR()
-learning_rate = 0.001
+gl_model = CNN()
 round_limit = 100 # No. of global rounds
 curr_round = 0
-gl_model = randint(0, 10)
 
 # wait for the first connection 
 # and the following connections in the following 30s
@@ -60,7 +70,7 @@ first_conn_time = 0
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind((IP, port_server)) # Bind to the port
     while True:
-        data_recv, addr = s.recvfrom(2048)
+        data_recv, addr = s.recvfrom(4096)
         data_recv = pickle.loads(data_recv)
         # check if this is the first connection
         if len(clients_lst) == 0:
@@ -86,6 +96,14 @@ for round in range(round_limit):
             s_bcast.sendto(gl_model.encode(), client[1])
             s_bcast.close()
 
+    # receive local models from all clients
+    responded_clients = []
+    while len(responded_clients) < len(clients_lst):
+        responded_clients += 1
+        data_recv, addr = s.recvfrom(65507)
+        data_recv = pickle.loads(data_recv)
+        # check if this msg is a handshaking msg from a late-joinned client
+
     # Evaluate the global model across all clients
     avg_acc = evaluate(clients_lst)
     acc.append(avg_acc)
@@ -98,5 +116,5 @@ for round in range(round_limit):
     # Above process training all clients and all client paricipate to server, how can we just select subset of user for aggregation
     loss.append(avgLoss)
 
-    # TODO:  Aggregate all clients model to obtain new global model 
-    aggregate_parameters(server_model, clients_lst, total_train_samples)
+    # Aggregate all clients model to obtain new global model 
+    aggregate_parameters(gl_model, clients_lst, total_train_samples)
