@@ -32,3 +32,8 @@ The following is an example where client1 uses GD, client2 uses minibatch GD, cl
 ### You can also run all clients at once using make_clients.sh
 To do this, type `bash make_clients.sh`,
 then use `screen -r <Client-id>` to access the virtual terminal of each client.
+
+### View the result
+After completeing the training process, each client's local accuracy and loss for each communication round can
+be found in the corresponding log file '{client_id}_log.txt', and all the global results are store in files
+global_accuracy.txt and global_loss.txt.
