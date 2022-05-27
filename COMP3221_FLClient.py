@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from torch.autograd import Variable
 
 num_epochs = 10
-learning_rate = 0.00014
+learning_rate = 0.01
 batch_size = 128
 
 def get_data(id=""):
@@ -188,7 +188,7 @@ while True:
 
     # print the client information
     print("Training loss: {:2f}".format(local_loss))
-    print("Testing accuracy: {:.2f}%".format(local_accuracy))
+    print("Testing accuracy: {:.2f}%".format(local_accuracy*100))
 
     # save local acc and loss
     local_acc_loss_lst.append([local_accuracy, local_loss])

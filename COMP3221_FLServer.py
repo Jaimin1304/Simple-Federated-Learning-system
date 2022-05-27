@@ -18,6 +18,7 @@ class MCLR(nn.Module):
         # Create a linear transformation to the incoming data
         # Input dimension: 784 (28 x 28), Output dimension: 10 (10 classes)
         self.fc1 = nn.Linear(784, 10)
+        self.fc1.weight.data = torch.rand(self.fc1.weight.size())
 
     # Define how the model is going to be run, from input to output
     def forward(self, x):
@@ -168,12 +169,10 @@ for round in range(round_limit):
     acc.append(avg_acc)
     print("Global Round:", round + 1, "\nAverage accuracy across all clients : {:.2f}%".format(avg_acc * 100))
 
-    # Each client keeps training process to obtain new local model from the global model 
     avgLoss = 0
     for client in clients_lst:
         if client[5] != None:
             avgLoss += client[5]
-    # Above process training all clients and all client paricipate to server, how can we just select subset of client for aggregation
     loss.append(avgLoss)
 
     # update total_train_samples
