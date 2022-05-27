@@ -7,7 +7,7 @@ In a separate terminal, type: `python COMP3221_FLServer.py <Port-Server> <Sub-cl
 ### Disable clients subsampling with flag 0 <M=K>:
 e.g. `python3 COMP3221_FLServer.py 6000 0`
 
-### Enable clients subsampling with flag 1 <M<K>>:
+### Enable clients subsampling with flag 1 <M<K>:
 e.g. `python3 COMP3221_FLServer.py 6000 1`
 
 ## Run the clients
