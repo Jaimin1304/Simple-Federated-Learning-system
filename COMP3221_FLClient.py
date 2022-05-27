@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from torch.autograd import Variable
 
 num_epochs = 10
-learning_rate = 0.00014
+learning_rate = 0.01
 batch_size = 128
 
 def get_data(id=""):
@@ -44,6 +44,7 @@ class MCLR(nn.Module):
         # Create a linear transformation to the incoming data
         # Input dimension: 784 (28 x 28), Output dimension: 10 (10 classes)
         self.fc1 = nn.Linear(784, 10)
+        nn.init.xavier_uniform_(self.fc1.weight)
 
     # Define how the model is going to be run, from input to output
     def forward(self, x):
