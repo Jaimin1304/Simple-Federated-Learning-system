@@ -191,5 +191,10 @@ for round in range(round_limit):
             s_bcast.sendto(pickle.dumps(gl_model), (IP, client[1]))
             s_bcast.close()
 
+with open('global_accuracy.txt', 'w') as f:
+    f.writelines([str(i)+'\n' for i in acc])
 
-print(acc)
+with open('global_loss.txt', 'w') as f:
+    f.writelines([str(i.item())+'\n' for i in loss])
+
+print('Training process complete! final accuracy: {:0.4f}, final loss: {:0.4f}\n'.format(acc[-1], loss[-1]))
