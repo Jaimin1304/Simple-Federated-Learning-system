@@ -66,15 +66,12 @@ class Handshakes_handler(threading.Thread):
         # wait for the first connection
         # and the following connections in the following 30s
         while True:
-            s_hh = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s_hh.bind((IP, port_server)) # Bind to the port
             print('Handshakes_handler')
             data_recv = s_hh.recv(2048)
             data_recv = pickle.loads(data_recv)
             # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
             if len(clients_lst) < 5:
                 clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None])
-            s_hh.close()
 
 
 # wait for the first connection 
@@ -85,17 +82,20 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     print('connection!')
     data_recv = pickle.loads(data_recv)
     s.close()
-    # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
-    clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None])
-    # start handshake_handler thread to deal with the rest of the handshakes
-    # and count down 30s
-    handshakes_handler = Handshakes_handler()
-    handshakes_handler.start()
-    print('hey')
-    # stop receiving handshaking msg 30s after the first handshake
-    handshakes_handler.join(5)
-    s_hh.close()
 
+# add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
+clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None])
+# start handshake_handler thread to deal with the rest of the handshakes
+# and count down 30s
+s_hh = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s_hh.bind((IP, port_server)) # Bind to the port
+handshakes_handler = Handshakes_handler()
+handshakes_handler.start()
+print('start')
+# stop receiving handshaking msg 30s after the first handshake
+handshakes_handler.join(5)
+print('join')
+s_hh.close()
 
 # broadcast the initial global model to all clients
 for client in clients_lst:
@@ -103,6 +103,7 @@ for client in clients_lst:
         print((IP, client[1]))
         print(getsizeof(pickle.dumps(gl_model)))
         s_bcast.sendto(pickle.dumps(gl_model), (IP, client[1]))
+        s_bcast.close()
 
 # Runing FedAvg
 loss = []
@@ -121,7 +122,7 @@ for round in range(round_limit):
     responded_clients = 0
     while responded_clients < len(clients_lst):
         responded_clients += 1
-        data_recv = s.recv(2048)
+        data_recv = s.recv(65507)
         data_recv = pickle.loads(data_recv)
         # check if this msg is a handshaking msg from a late-joinned client
         if data_recv[0] == 'handshake':

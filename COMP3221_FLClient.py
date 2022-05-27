@@ -161,7 +161,7 @@ minibatch_loader = {
 # keep listening to the server 
 while True:
     # receive global model from the server
-    received_data, addr = server_socket.recvfrom(2048)
+    received_data, addr = server_socket.recvfrom(65507)
     global_model = pickle.loads(received_data)
 
     # upadte local model parameters 
