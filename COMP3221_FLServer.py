@@ -115,7 +115,7 @@ handshakes_handler = Handshakes_handler()
 handshakes_handler.start()
 #print('start')
 # stop receiving handshaking msg 30s after the first handshake
-handshakes_handler.join(5)
+handshakes_handler.join(30)
 #print('join')
 s_hh.close()
 
