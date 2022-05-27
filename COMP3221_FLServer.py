@@ -160,7 +160,7 @@ for round in range(round_limit):
     # Evaluate the global model across all clients
     avg_acc = evaluate(clients_lst)
     acc.append(avg_acc)
-    print("Global Round:", round + 1, "Average accuracy across all clients : {:.2f}%".format(avg_acc * 100))
+    print("Global Round:", round + 1, "\nAverage accuracy across all clients : {:.2f}%".format(avg_acc * 100))
 
     # Each client keeps training process to obtain new local model from the global model 
     avgLoss = 0
