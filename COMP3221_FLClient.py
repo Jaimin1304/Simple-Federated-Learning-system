@@ -114,7 +114,7 @@ def test(model, loader):
         test_counter = 0
         test_accuracy = 0
         for images, labels in loader['test']:
-            test_output, last_layer = model(images)
+            test_output = model(images)
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             test_accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
             test_counter += 1
@@ -161,7 +161,7 @@ minibatch_loader = {
 # keep listening to the server 
 while True:
     # receive global model from the server
-    received_data, addr = server_socket.recvfrom(2048)
+    received_data, addr = server_socket.recvfrom(65535)
     global_model = pickle.loads(received_data)
 
     # upadte local model parameters 
