@@ -74,7 +74,7 @@ def train(num_epochs, model, loader, opt_method):
                 # gives batch data, normalize x when iterate train_loader
                 b_x = Variable(images)   # batch x
                 b_y = Variable(labels)   # batch y
-                output = model(b_x)[0]
+                output = model(b_x)
                 loss = loss_func(output, b_y)
                 
                 # clear gradients for this training step
