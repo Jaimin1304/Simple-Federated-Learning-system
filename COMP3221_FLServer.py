@@ -10,6 +10,7 @@ import pickle
 from random import randint
 from sys import getsizeof
 from socket import error as socket_error
+import random
 
 class MCLR(nn.Module):
     def __init__(self):
@@ -34,10 +35,22 @@ def aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client)
     for param in gl_model.parameters():
         param.data = torch.zeros_like(param.data)
 
-    for client in clients_lst:
-        if client[3] != None:
-            for server_param, client_param in zip(gl_model.parameters(), client[3].parameters()):
-                server_param.data = server_param.data + client_param.data.clone() * client[2] / total_train_samples
+    if not sub_client or len(clients_lst) == 1:
+        for client in clients_lst:
+            if client[3] != None:
+                for server_param, client_param in zip(gl_model.parameters(), client[3].parameters()):
+                    server_param.data = server_param.data + client_param.data.clone() * client[2] / total_train_samples
+    else:
+        if len(clients_lst) >= 2:
+            client_1 = random.choice(clients_lst)
+            other_clients = clients_lst.copy()
+            other_clients.remove(client_1)
+            client_2 = random.choice(other_clients)
+            if client_1[3] != None and client_2[3] != None:
+                for server_param, client_param in zip(gl_model.parameters(), client_1[3].parameters()):
+                    server_param.data = server_param.data + client_param.data.clone() * client_1[2] / total_train_samples
+                for server_param, client_param in zip(gl_model.parameters(), client_2[3].parameters()):
+                    server_param.data = server_param.data + client_param.data.clone() * client_2[2] / total_train_samples
     return gl_model
 
 def evaluate(clients_lst):
