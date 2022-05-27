@@ -9,7 +9,7 @@ from sys import argv
 import pickle
 from random import randint
 from sys import getsizeof
-
+from socket import error as socket_error
 
 class MCLR(nn.Module):
     def __init__(self):
@@ -35,8 +35,9 @@ def aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client)
         param.data = torch.zeros_like(param.data)
 
     for client in clients_lst:
-        for server_param, client_param in zip(gl_model.parameters(), client[3].parameters()):
-            server_param.data = server_param.data + client_param.data.clone() * client[2] / total_train_samples
+        if client[3] != None:
+            for server_param, client_param in zip(gl_model.parameters(), client[3].parameters()):
+                server_param.data = server_param.data + client_param.data.clone() * client[2] / total_train_samples
     return gl_model
 
 def evaluate(clients_lst):
@@ -66,12 +67,15 @@ class Handshakes_handler(threading.Thread):
         # wait for the first connection
         # and the following connections in the following 30s
         while True:
-            print('Handshakes_handler')
-            data_recv = s_hh.recv(2048)
-            data_recv = pickle.loads(data_recv)
-            # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
-            if len(clients_lst) < 5:
-                clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None])
+            try:
+                print('Handshakes_handler')
+                data_recv = s_hh.recv(2048)
+                data_recv = pickle.loads(data_recv)
+                # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy, loss]
+                if len(clients_lst) < 5:
+                    clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
+            except socket_error as e:
+                break
 
 
 # wait for the first connection 
@@ -83,8 +87,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     data_recv = pickle.loads(data_recv)
     s.close()
 
-# add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
-clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None])
+# add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy, loss]
+clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
 # start handshake_handler thread to deal with the rest of the handshakes
 # and count down 30s
 s_hh = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -122,18 +126,22 @@ for round in range(round_limit):
     responded_clients = 0
     while responded_clients < len(clients_lst):
         responded_clients += 1
+        print("waiting client's msg")
         data_recv = s.recv(65507)
+        print("client's msg received")
         data_recv = pickle.loads(data_recv)
         # check if this msg is a handshaking msg from a late-joinned client
         if data_recv[0] == 'handshake':
             if len(clients_lst) < 5:
-                clients_lst.append([int(data_recv[1]), int(data_recv[3]), int(data_recv[2]), None, None])
+                clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
             continue
 
         client_id = data_recv[1]
         for c in clients_lst:
             if client_id == c[1]:
-                c[3] = data_recv[2]
+                c[3] = data_recv[2] # model
+                c[4] = data_recv[3] # local accuracy
+                c[5] = data_recv[4] # local loss
                 print(f'Getting local model from client {c[0]}')
 
     # Evaluate the global model across all clients
@@ -144,7 +152,8 @@ for round in range(round_limit):
     # Each client keeps training process to obtain new local model from the global model 
     avgLoss = 0
     for client in clients_lst:
-        avgLoss += client.train(1)
+        if client[5] != None:
+            avgLoss += client[5]
     # Above process training all clients and all client paricipate to server, how can we just select subset of client for aggregation
     loss.append(avgLoss)
 

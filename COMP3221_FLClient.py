@@ -74,7 +74,7 @@ def train(num_epochs, model, loader, opt_method):
                 # gives batch data, normalize x when iterate train_loader
                 b_x = Variable(images)   # batch x
                 b_y = Variable(labels)   # batch y
-                output = model(b_x)[0]
+                output = model(b_x)
                 loss = loss_func(output, b_y)
                 
                 # clear gradients for this training step
@@ -93,9 +93,9 @@ def train(num_epochs, model, loader, opt_method):
             # gives batch data, normalize x when iterate train_loader
             b_x = Variable(X_train)   # batch x
             b_y = Variable(y_train)   # batch y
-            output = model(b_x)[0]
+            output = model(b_x)
             loss = loss_func(output, b_y)
-            
+
             # clear gradients for this training step
             optimizer.zero_grad()
             # backpropagation, compute gradients 
@@ -114,12 +114,12 @@ def test(model, loader):
         test_counter = 0
         test_accuracy = 0
         for images, labels in loader['test']:
-            test_output, last_layer = model(images)
+            test_output = model(images)
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             test_accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
             test_counter += 1
         print('Test accuracy of the model on the test images: %.2f' % (test_accuracy/test_counter))
-        return test_accuracy
+        return test_accuracy/test_counter
 
 
 IP = '127.0.0.1'
@@ -161,7 +161,7 @@ minibatch_loader = {
 # keep listening to the server 
 while True:
     # receive global model from the server
-    received_data, addr = server_socket.recvfrom(65507)
+    received_data = server_socket.recv(65507)
     global_model = pickle.loads(received_data)
 
     # upadte local model parameters 
@@ -182,7 +182,8 @@ while True:
     print("Local training...")
     print("Sending new local model\n")
 
-    local_model_with_id = ['model', client_id, model, local_accuracy]
+    local_model_with_id = ['model', client_id, model, local_accuracy, local_loss]
 
     # send local model (after training) back to the server
-    client_socket.sendto(pickle.dumps(local_model_with_id), addr)
+    client_socket.sendto(pickle.dumps(local_model_with_id), (IP, port_server))
+    print('client msg sended')
