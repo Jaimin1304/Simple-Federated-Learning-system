@@ -151,7 +151,7 @@ for round in range(round_limit):
 
         client_id = data_recv[1]
         for c in clients_lst:
-            if client_id == c[1]:
+            if client_id == c[0]:
                 c[3] = data_recv[2] # model
                 c[4] = data_recv[3] # local accuracy
                 c[5] = data_recv[4] # local loss
@@ -181,6 +181,7 @@ for round in range(round_limit):
 
     # broadcast the global model to all clients
     print('Broadcasting new global model')
+    print(clients_lst)
     print()
     for client in clients_lst:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
