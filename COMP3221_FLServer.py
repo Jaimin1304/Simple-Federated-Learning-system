@@ -11,6 +11,8 @@ from random import randint
 from sys import getsizeof
 from socket import error as socket_error
 import random
+import matplotlib
+import matplotlib.pyplot as plt
 
 class MCLR(nn.Module):
     def __init__(self):
@@ -187,3 +189,6 @@ for round in range(round_limit):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
             s_bcast.sendto(pickle.dumps(gl_model), (IP, client[1]))
             s_bcast.close()
+
+
+
