@@ -4,10 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import socket
-from time import sleep, time
 from sys import argv
 import pickle
-from random import randint
 from sys import getsizeof
 from socket import error as socket_error
 import random
@@ -51,14 +49,14 @@ def aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client)
                     server_param.data = server_param.data + client_param.data.clone() * client_1[2] / total_train_samples
                 for server_param, client_param in zip(gl_model.parameters(), client_2[3].parameters()):
                     server_param.data = server_param.data + client_param.data.clone() * client_2[2] / total_train_samples
+            else:
+                print('wrong client chosen!')
     return gl_model
 
 def evaluate(clients_lst):
-    total_accurancy = 0
-    for client in clients_lst:
-        if client[4] != None:
-            total_accurancy += client[4]
-    return total_accurancy/len(clients_lst)
+    clean_client_lst = [i for i in clients_lst if i[4] != None]
+    total_accurancy = sum([i[4] for i in clean_client_lst])
+    return total_accurancy/len(clean_client_lst)
 
 
 # Init parameters
@@ -132,6 +130,7 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind((IP, port_server))
 
 for round in range(round_limit):
+
     print(f'Global iteration {round+1}:')
     print(f'Total number of clients: {len(clients_lst)}')
 
@@ -187,3 +186,4 @@ for round in range(round_limit):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
             s_bcast.sendto(pickle.dumps(gl_model), (IP, client[1]))
             s_bcast.close()
+
