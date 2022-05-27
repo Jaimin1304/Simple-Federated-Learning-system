@@ -169,17 +169,12 @@ for round in range(round_limit):
     acc.append(avg_acc)
     print("Global Round:", round + 1, "\nAverage accuracy across all clients : {:.2f}%".format(avg_acc * 100))
 
-    avgLoss = 0
-    for client in clients_lst:
-        if client[5] != None:
-            avgLoss += client[5]
+    avgLoss = sum([i[5] for i in clients_lst if i[5] != None])
+
     loss.append(avgLoss)
 
     # update total_train_samples
-    total_train_samples = 0
-    for i in clients_lst:
-        if i[3] != None and i[4] != None:
-            total_train_samples += i[2]
+    total_train_samples = sum([i[2] for i in clients_lst if i[3] != None and i[4] != None])
 
     # Aggregate all clients model to obtain new global model 
     gl_model = aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client)
