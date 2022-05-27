@@ -160,7 +160,7 @@ for round in range(round_limit):
     # Evaluate the global model across all clients
     avg_acc = evaluate(clients_lst)
     acc.append(avg_acc)
-    print("Global Round:", round + 1, "Average accuracy across all clients : ", avg_acc)
+    print("Global Round:", round + 1, "Average accuracy across all clients : {:.2f}%".format(avg_acc * 100))
 
     # Each client keeps training process to obtain new local model from the global model 
     avgLoss = 0
@@ -182,7 +182,7 @@ for round in range(round_limit):
     # broadcast the global model to all clients
     print('Broadcasting new global model')
     #print(clients_lst)
-    #print()
+    print()
     for client in clients_lst:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
             s_bcast.sendto(pickle.dumps(gl_model), (IP, client[1]))

@@ -118,7 +118,7 @@ def test(model, loader):
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             test_accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
             test_counter += 1
-        print('Test accuracy of the model on the test images: %.2f' % (test_accuracy/test_counter))
+        print('Test accuracy of the model on the test images: {:.2f}%'.format(test_accuracy * 100/test_counter))
         return test_accuracy/test_counter
 
 
