@@ -14,7 +14,7 @@ from torch.autograd import Variable
 
 num_epochs = 10
 learning_rate = 0.0001
-batch_size = 256
+batch_size = 128
 
 def get_data(id=""):
     train_path = os.path.join("FLdata", "train", "mnist_train_" + str(id) + ".json")
