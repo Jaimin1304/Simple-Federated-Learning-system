@@ -11,34 +11,22 @@ from random import randint
 from sys import getsizeof
 
 
-class CNN(nn.Module):
+class MCLR(nn.Module):
     def __init__(self):
-        super(CNN, self).__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=1,
-                out_channels=16,
-                kernel_size=5,
-                stride=1,
-                padding=2,
-            ),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(16, 32, 5, 1, 2),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-        )
-        # fully connected layer, output 10 classes
-        self.out = nn.Linear(32 * 7 * 7, 10)
+        super(MCLR, self).__init__()
+        # Create a linear transformation to the incoming data
+        # Input dimension: 784 (28 x 28), Output dimension: 10 (10 classes)
+        self.fc1 = nn.Linear(784, 10)
+
+    # Define how the model is going to be run, from input to output
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
-        x = x.view(x.size(0), -1)
-        output = self.out(x)
-        return output, x    # return x for visualization
+        # Flattens input by reshaping it into a one-dimensional tensor. 
+        x = torch.flatten(x, 1)
+        # Apply linear transformation
+        x = self.fc1(x)
+        # Apply a softmax followed by a logarithm
+        output = F.log_softmax(x, dim=1)
+        return output
 
 def aggregate_parameters(gl_model, clients_lst, total_train_samples, sub_client):
     print('Aggregating new global model')
@@ -58,15 +46,14 @@ def evaluate(clients_lst):
             total_accurancy += client[4]
     return total_accurancy/len(clients_lst)
 
+
 # Init parameters
 port_server = int(argv[1])
 sub_client = int(argv[2])
 IP = '127.0.0.1'
 clients_lst = []
-gl_model = CNN()
-print(getsizeof(gl_model.parameters))
+gl_model = MCLR()
 round_limit = 100 # No. of global rounds
-
 
 
 class Handshakes_handler(threading.Thread):
@@ -86,16 +73,16 @@ class Handshakes_handler(threading.Thread):
             data_recv = pickle.loads(data_recv)
             # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
             if len(clients_lst) < 5:
-                clients_lst.append([data_recv[1], int(data_recv[3]), int(data_recv[2]), None, None])
+                clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None])
             s_hh.close()
 
 
 # wait for the first connection 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind((IP, port_server)) # Bind to the port
-    print('hahaha')
     # handle the first handshake outside the handshake_handler thread
     data_recv = s.recv(2048)
+    print('connection!')
     data_recv = pickle.loads(data_recv)
     s.close()
     # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy]
@@ -107,14 +94,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     print('hey')
     # stop receiving handshaking msg 30s after the first handshake
     handshakes_handler.join(5)
-    
+    s_hh.close()
+
 
 # broadcast the initial global model to all clients
 for client in clients_lst:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
         print((IP, client[1]))
-        s_bcast.sendto(pickle.dumps(gl_model.parameters), (IP, client[1]))
-        s_bcast.close()
+        print(getsizeof(pickle.dumps(gl_model)))
+        s_bcast.sendto(pickle.dumps(gl_model), (IP, client[1]))
 
 # Runing FedAvg
 loss = []

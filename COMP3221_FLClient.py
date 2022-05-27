@@ -38,37 +38,25 @@ def get_data(id=""):
     return X_train, y_train, X_test, y_test, train_samples, test_samples
 
 
-class CNN(nn.Module):
+class MCLR(nn.Module):
     def __init__(self):
-        super(CNN, self).__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(
-                in_channels=1,
-                out_channels=16,
-                kernel_size=5,
-                stride=1,
-                padding=2,
-            ),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(16, 32, 5, 1, 2),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-        )
-        # fully connected layer, output 10 classes
-        self.out = nn.Linear(32 * 7 * 7, 10)
+        super(MCLR, self).__init__()
+        # Create a linear transformation to the incoming data
+        # Input dimension: 784 (28 x 28), Output dimension: 10 (10 classes)
+        self.fc1 = nn.Linear(784, 10)
+
+    # Define how the model is going to be run, from input to output
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
-        x = x.view(x.size(0), -1)
-        output = self.out(x)
-        return output, x    # return x for visualization
+        # Flattens input by reshaping it into a one-dimensional tensor. 
+        x = torch.flatten(x, 1)
+        # Apply linear transformation
+        x = self.fc1(x)
+        # Apply a softmax followed by a logarithm
+        output = F.log_softmax(x, dim=1)
+        return output
 
 
-model = CNN()
+model = MCLR()
 loss_func = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate) 
 
@@ -147,13 +135,11 @@ test_data = [(x, y) for x, y in zip(X_test, y_test)]
 
 # create client_socket for sending client information and the local model to the server
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
 client_socket.sendto(pickle.dumps(('handshake', client_id, list(X_train.shape)[0], port_client)), server_address)
 
 # create server_socket for receiving the global model from the server
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, ord(client_id[-1]))
-server_socket.bind(('', port_client))
+server_socket.bind((IP, port_client))
 
 # dataloader for the minibatch GD
 minibatch_loader = {
