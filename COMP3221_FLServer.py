@@ -169,12 +169,10 @@ for round in range(round_limit):
     acc.append(avg_acc)
     print("Global Round:", round + 1, "\nAverage accuracy across all clients : {:.2f}%".format(avg_acc * 100))
 
-    # Each client keeps training process to obtain new local model from the global model 
     avgLoss = 0
     for client in clients_lst:
         if client[5] != None:
             avgLoss += client[5]
-    # Above process training all clients and all client paricipate to server, how can we just select subset of client for aggregation
     loss.append(avgLoss)
 
     # update total_train_samples
