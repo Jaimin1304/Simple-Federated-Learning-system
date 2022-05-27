@@ -12,7 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
 
-num_epochs = 10
+num_epochs = 30
 learning_rate = 0.0001
 batch_size = 128
 
