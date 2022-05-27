@@ -4,10 +4,10 @@ This is a simple Federated Learning (FL) system for COMP3221 Assignment 3, devel
 ## Run the server
 In a separate terminal, type: `python COMP3221_FLServer.py <Port-Server> <Sub-client>`
 
-### Disable clients subsampling with flag 0 <M=K>:
+### Disable clients subsampling with flag 0 (M=K):
 e.g. `python3 COMP3221_FLServer.py 6000 0`
 
-### Enable clients subsampling with flag 1 <M<K>:
+### Enable clients subsampling with flag 1 (M<K):
 e.g. `python3 COMP3221_FLServer.py 6000 1`
 
 ## Run the clients
