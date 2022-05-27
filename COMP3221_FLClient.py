@@ -84,8 +84,8 @@ def train(num_epochs, model, loader, opt_method):
                 # apply gradients
                 optimizer.step()
 
-                if (i+1) % 5 == 0:
-                    print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
+                #if (i+1) % 5 == 0:
+                #    print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, i + 1, total_step, loss.item()))
 
     # train the model using GD
     else:
@@ -103,7 +103,7 @@ def train(num_epochs, model, loader, opt_method):
             # apply gradients
             optimizer.step()
 
-            print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, loss.item()))
+            #print ('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, loss.item()))
 
     return loss.data
 
@@ -118,7 +118,7 @@ def test(model, loader):
             pred_y = torch.max(test_output, 1)[1].data.squeeze()
             test_accuracy += (pred_y == labels).sum().item() / float(labels.size(0))
             test_counter += 1
-        print('Test accuracy of the model on the test images: {:.2f}%'.format(test_accuracy * 100/test_counter))
+        #print('Test accuracy of the model on the test images: {:.2f}%'.format(test_accuracy * 100/test_counter))
         return test_accuracy/test_counter
 
 
@@ -157,33 +157,54 @@ minibatch_loader = {
 # train(num_epochs, model, minibatch_loader)
 # test()
 
+local_acc_loss_lst = []
+
+# create an empty log file
+with open(f'{client_id}_log.txt', 'w') as f:
+    f.write('accuracy | loss\n')
 
 # keep listening to the server 
+print("I am {}".format(client_id))
+print("Receiving new global model...")
 while True:
     # receive global model from the server
     received_data = server_socket.recv(65507)
     global_model = pickle.loads(received_data)
+
+    # check if this is a terminate signal
+    if global_model == 'mission complete':
+        break
 
     # upadte local model parameters 
     for local_param, global_param in zip(model.parameters(), global_model.parameters()):
         local_param.data = global_param.data.clone()
 
     # train the local model using the parameters from the global model
+    print("Local training...")
     local_loss = train(num_epochs, model, minibatch_loader, opt_method)
 
     # test using the local model (after training), and calculate testing accuracy
     local_accuracy = test(model, minibatch_loader)
 
     # print the client information
-    print("I am {}".format(client_id))
-    print("Receiving new global model")
     print("Training loss: {:2f}".format(local_loss))
     print("Testing accuracy: {:.2f}%".format(local_accuracy))
-    print("Local training...")
-    print("Sending new local model\n")
 
-    local_model_with_id = ['model', client_id, model, local_accuracy, local_loss]
+    # save local acc and loss
+    local_acc_loss_lst.append([local_accuracy, local_loss])
+
+    data_send = ['model', client_id, model, local_accuracy, local_loss]
 
     # send local model (after training) back to the server
-    client_socket.sendto(pickle.dumps(local_model_with_id), (IP, port_server))
-    print('client msg sended')
+    print("Sending new local model...")
+    client_socket.sendto(pickle.dumps(data_send), (IP, port_server))
+    print("Model sent")
+    print()
+    print("I am {}".format(client_id))
+    print("Receiving new global model...")
+
+print('\nTraining process complete!\n')
+
+# write all local acc and loss to the log file
+with open(f'{client_id}_log.txt', 'a') as f:
+    f.writelines([str(i[0])+ ' | ' + str(i[1].item()) +'\n' for i in local_acc_loss_lst])

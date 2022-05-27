@@ -89,6 +89,7 @@ class Handshakes_handler(threading.Thread):
                 # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy, loss]
                 if len(clients_lst) < 5:
                     clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
+                    print(f'new connection from {data_recv[1]}')
             except socket_error as e:
                 break
 
@@ -104,6 +105,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
 
 # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy, loss]
 clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
+print(f'new connection from {data_recv[1]}')
 # start handshake_handler thread to deal with the rest of the handshakes
 # and count down 30s
 s_hh = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -150,6 +152,7 @@ for round in range(round_limit):
         if data_recv[0] == 'handshake':
             if len(clients_lst) < 5:
                 clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
+                print(f'new connection from {data_recv[1]}')
             continue
 
         client_id = data_recv[1]
@@ -198,3 +201,9 @@ with open('global_loss.txt', 'w') as f:
     f.writelines([str(i.item())+'\n' for i in loss])
 
 print('Training process complete! final accuracy: {:0.4f}, final loss: {:0.4f}\n'.format(acc[-1], loss[-1]))
+
+# send a terminate signal to all clients
+for client in clients_lst:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s_bcast:
+        s_bcast.sendto(pickle.dumps('mission complete'), (IP, client[1]))
+        s_bcast.close()
