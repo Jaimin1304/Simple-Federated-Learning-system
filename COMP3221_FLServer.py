@@ -78,21 +78,46 @@ class Handshakes_handler(threading.Thread):
         super().__init__()
 
     def run(self):
-        global clients_lst
-        global s_hh
-        # wait for the first connection
-        # and the following connections in the following 30s
+        global clients_lst, s_hh
+        # wait for the first connection and the following connections in the following 30s
         while True:
             try:
                 #print('Handshakes_handler')
                 data_recv = s_hh.recv(2048)
                 data_recv = pickle.loads(data_recv)
-                # add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy, loss]
                 if len(clients_lst) < 5:
-                    clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
+                    # add new client: [client_id, client_addr, data_recv_size, model, accuracy, loss, alive_flag]
+                    clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None, False])
                     print(f'new connection from {data_recv[1]}')
             except socket_error as e:
                 break
+
+
+class Datapackages_handler(threading.Thread):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def run(self):
+        global clients_lst, s
+        data_recv = s.recv(65507)
+        #print("client's msg received")
+        data_recv = pickle.loads(data_recv)
+        # check if this msg is a handshaking msg from a late-joinned client
+        if data_recv[0] == 'handshake':
+            if len(clients_lst) < 5:
+                # add new client: [client_id, client_addr, data_recv_size, model, accuracy, loss, alive_flag]
+                clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None, False])
+                print(f'new connection from {data_recv[1]}')
+            return
+
+        client_id = data_recv[1]
+        for c in clients_lst:
+            if client_id == c[0]:
+                c[3] = data_recv[2] # model
+                c[4] = data_recv[3] # local accuracy
+                c[5] = data_recv[4] # local loss
+                c[6] = True # set the alive_flag to ture, indicating this client is alive
+                print(f'Getting local model from client {c[0]}')
 
 
 # wait for the first connection 
@@ -104,8 +129,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     data_recv = pickle.loads(data_recv)
     s.close()
 
-# add new client to the lst: [client_id, client_addr, data_recv_size, model, accuracy, loss]
-clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
+# add new client: [client_id, client_addr, data_recv_size, model, accuracy, loss, alive_flag]
+clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None, False])
 print(f'new connection from {data_recv[1]}')
 # start handshake_handler thread to deal with the rest of the handshakes
 # and count down 30s
@@ -115,7 +140,7 @@ handshakes_handler = Handshakes_handler()
 handshakes_handler.start()
 #print('start')
 # stop receiving handshaking msg 30s after the first handshake
-handshakes_handler.join(30)
+handshakes_handler.join(10)
 #print('join')
 s_hh.close()
 
@@ -137,32 +162,28 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind((IP, port_server))
 
 for round in range(round_limit):
+    # reset alive_flag for every clinet records
+    for i in clients_lst:
+        i[6] = False
 
     print(f'Global iteration {round+1}:')
     print(f'Total number of clients: {len(clients_lst)}')
-
     # receive local models from all clients
     responded_clients = 0
     while responded_clients < len(clients_lst):
+        print(responded_clients)
         responded_clients += 1
         #print("waiting client's msg")
-        data_recv = s.recv(65507)
-        #print("client's msg received")
-        data_recv = pickle.loads(data_recv)
-        # check if this msg is a handshaking msg from a late-joinned client
-        if data_recv[0] == 'handshake':
-            if len(clients_lst) < 5:
-                clients_lst.append([data_recv[1], data_recv[3], int(data_recv[2]), None, None, None])
-                print(f'new connection from {data_recv[1]}')
-            continue
+        datapackages_handler = Datapackages_handler()
+        datapackages_handler.start()
+        datapackages_handler.join(1)
 
-        client_id = data_recv[1]
-        for c in clients_lst:
-            if client_id == c[0]:
-                c[3] = data_recv[2] # model
-                c[4] = data_recv[3] # local accuracy
-                c[5] = data_recv[4] # local loss
-                print(f'Getting local model from client {c[0]}')
+    # delete clients from the clients_lst who failed to send data to the server
+    for i in clients_lst[::-1]:
+        if not i[6] and i[5] != None and i[4] != None and i[3] != None:
+            print(f'{i[0]} disconnected!')
+            clients_lst.remove(i)
+    #print(clients_lst)
 
     # Evaluate the global model across all clients
     avg_acc = evaluate(clients_lst)
